@@ -1,5 +1,5 @@
 ---
-title: "EASI-Fish vignette"
+title: "EASI-FishR vignette"
 format: pdf
 editor: visual
 execute:
@@ -9,16 +9,17 @@ execute:
 
 ## Introduction
 
-Here, we provide example code and application of the Ecological Assessment of the Sustainable Impacts of Fisheries (EASI-Fish) ecological risk assessment approach as detailed in Hill et al. (in prep). We apply EASI-Fish to two example species, Alopias vulpinus (ALV) and Carcharhinus longimanus (OCS) and two fisheries to show how this approach can be applied to multiple species and fisheries simultaneously.
+Here, we provide example code and application of the Ecological Assessment of the Sustainable Impacts of Fisheries (EASI-Fish) ecological risk assessment approach developed by Griffiths et al. (2019) and detailed in Hill et al. (in prep). We apply EASI-Fish to two example species, Alopias vulpinus (ALV) and Carcharhinus longimanus (OCS) and two fisheries to show how this approach can be applied to multiple species and fisheries simultaneously.
 
 ```{r echo = F}
 # Load librares
 library(tidyverse)
 library(caret) # For Liu M estimator
 library(lattice) # For Liu M estimator
-library(flextable)
+library(flextable) # for results table
+library(grid) # for results plot
 
-# This script contains a rnage of functions used below
+# This script contains a range of functions used below
 # source('C:/Users/nickh/OneDrive - SPC/easifish/easifish_repo/OFP-FEMA-easifish/easi_funs.R')
 source('easifish_funcs.R')
 
@@ -62,9 +63,9 @@ easiM_estimator_all(funcs = c("hoenig83", "Liu_tmax", "Liu_Linf",
                     plot = T)
 ```
 
-Here, we convert the data frame into a list by species, and vary parameters as in Hill et al. (in prep) by simulation. This also expands the dataframe from 0-Linf, and by sim. This structure makes it easy to apply EASI-Fish across many species.
+We then convert this data frame into a list by species, and vary parameters as in Hill et al. (in prep) by simulation.
 
-The prep_life_history function takes in data in the format of the df above and converts it into a list by species, and within each list element (df) expands the data by simulation and length from 0-Linf. For each simulation, you can vary parameters using the input csv values defined by using column names in the param_settings argument, or you can define them custom as below. They will default to fixed if nothing is defined.
+The prep_life_history function takes in data in the format of the dataframe above and converts it into a list by species, and within each list element (df) expands the data by simulation and length from 0-Linf. For each simulation, you can vary parameters using the input csv values defined by using column names in the param_settings argument, or you can define them custom as below. They will default to fixed if nothing is defined. This structure makes it easy to apply EASI-Fish to many species. You can see in the snippet of the dataframe below that sim is 1 and length starts at 4 (0-4cm bin) and goes up in 4cm intervals.
 
 ```{r}
 lh_list <- prep_life_history(lh_df, 
@@ -79,9 +80,9 @@ head(lh_list[['ALV']])
 
 \clearpage
 
-Here, we can inspect how the parameters have been varies using natural mortality (M) as an example. As a uniform distribution used and only 10 sims for the purposes of illustration, the estimates show a somewhat random distribution.
+Here, we can inspect how the parameters have been varied using natural mortality (M) as an example. As a uniform distribution was used and only 10 sims for the purposes of illustration, the estimates show a somewhat patchy distribution.
 
-```{r}
+```{r echo = F}
 bind_rows(lh_list) |>
   dplyr::select(spp, sim, M_normal) |>
   dplyr::distinct(sim, spp, .keep_all = TRUE) |>
@@ -101,12 +102,6 @@ Lastly, now that we have the data in the correct format we can now estimate vari
 The functions applying each of these life history processes can be found in easi_funcs.R or by running easi_growth2 for example.
 
 ```{r}
-# load('data/easi_sels_wide3_gam.Rdata')
-# sels <- easi_sels2 |>
-#     dplyr::select(spp = sp, mn_length = len_bin, fshrys) |>
-#   dplyr::filter(spp %in% spps)
-# write.csv(sels, 'data/sels.csv')
-
 # Read in selectivity data from two fleets
 sels <- read.csv('data/sels.csv')
 
@@ -201,7 +196,7 @@ bind_rows(lh_processes) |>
   theme_classic()
 ```
 
-Lastly, we plot selectivity data for the two fisheries here.
+Lastly, we plot selectivity data for the two fisheries.
 
 ```{r echo = F}
 sels |>
@@ -236,20 +231,9 @@ fshry_df <- expand_grid(spp = spps, nsim = nsims, fshry) |>
 head(fshry_df)
 ```
 
-Here, we append overlap, at-vessel mortality and post-release mortality values to the data frame by species and fishery. Two different estimates of overlap are included including the original estimation of overlap using presence/absence at an annual timestep, and the updated approach using the cumulative sum at a monthly timestep. See Hill et al. (in prep) for details on how these were calculated. At-vessel mortality and post-release mortality estimates were extracted from the literature for each species and gear type (i.e. purse seine, longline).
+Here, we append overlap, at-vessel mortality and post-release mortality values to the data frame by species and fishery. Two different estimates of overlap are provided including the original estimation of overlap using presence/absence at an annual timestep, and the updated approach using the cumulative sum at a monthly timestep. See Hill et al. (in prep) for details on how these were calculated. At-vessel mortality and post-release mortality estimates were extracted from the literature for each species and gear type (i.e. purse seine, longline).
 
 ```{r}
-# load('data/overlaps_ensemble_df_combined_coastal2b_newxtract_ngb.Rdata')
-# 
-# olaps <- olaps_df_all |>
-#   dplyr::filter(spp %in% spps & fishery %in% fshrys) |>
-#   ungroup() |>
-#   dplyr::select(spp, fishery, temp_res, olap_pa, olap_cumsum) |>
-#   pivot_wider(names_from = temp_res, values_from = c(olap_pa, olap_cumsum)) |>
-#   dplyr::select(-c(olap_pa_month, olap_cumsum_annual))
-# 
-# write.csv(olaps, ('data/olap_inputs.csv'))
-
 # Load in olap, AVM and PRM csv
 fshry_spp_df <- read.csv('data/spp_fishery_inputs.csv')
 
@@ -257,7 +241,7 @@ fshry_spp_df <- read.csv('data/spp_fishery_inputs.csv')
 fshry_df <- left_join(fshry_df, fshry_spp_df, by = c('spp', 'fishery'))
 ```
 
-Here we append the life history df to the fishery df so that we can calculate encounterability which looks at the overlap of fishing gear and species distribution vertically in the water column. To calculate this you need the minimum and maximum depths of the gear, and the species.
+Here we append the life history dataframe to the fishery dataframe so that we can calculate encounterability which looks at the overlap of fishing gear and species distribution vertically in the water column. To calculate this you need the minimum and maximum depths of the gear, and the species.
 
 ```{r}
 spp_depth <- lh_df |>
@@ -280,6 +264,7 @@ Now, we have compiled all the required fishery parameters, we can now rearrange 
 fshry_list <- prep_fishery_data(fshry_df, param_settings = list(
         olap_pa_annual = list(dist = "truncnorm", sd = 0.05, min=0, max=1),
         olap_cumsum_month = list(dist = "truncnorm", sd = 0.05, min=0, max=1)))
+head(fshry_list[['ALV']])
 ```
 
 Now we can plot some of the fishery data to see what it looks like.
@@ -302,7 +287,7 @@ bind_rows(fshry_list) |>
 
 Now that we have prepped all the data we can now apply EASI-Fish. The first thing we do is estimate susceptibility. Here, we combine the life history and fisheries lists into a single dataframe, however these could be saved and read in separately within a loop if running a large number of species or scenarios.
 
-The get_Ffinite() function applies the susceptibility portion of EASI-Fish, both the original and updated. It does this based on whether or not the olap_type is defined as 'annual' or 'month'.
+The get_Ffinite() function applies the susceptibility portion of EASI-Fish, both the original and updated. It does this based on whether or not the olap_type is defined as 'annual' or 'month'. This function outputs a dataframe by species, sim, fishery and length with columns including selectivity, Ffinite, Fadj, and Fage.
 
 ```{r}
 # Define olap type ('annual' or 'month')
@@ -324,11 +309,13 @@ Fsusc_df <-
          Fadj = (Ffinite * Q) * effort,
          Fage = -log(1 - Fadj)) |>
   dplyr::select(spp, sim, fishery, mn_length, sel, Ffinite, Fadj, Fage)
+
+head(Fsusc_df)
 ```
 
 Here, we collate susceptibility results by fishery and plot.
 
-```{r}
+```{r echo = F}
 # Summarise susceptibility by fleet
 Fsusc_fshry <-
   Fsusc_df |> 
@@ -354,7 +341,7 @@ Fsusc_fshry |>
 
 And by length.
 
-```{r}
+```{r echo = F}
 # Summarise susceptibility by length
 Fsusc_len <-
   Fsusc_df |>
@@ -366,21 +353,21 @@ Fsusc_len <-
 # 
 Fsusc_len |>
   ggplot() +
-  aes(mn_length, Fsusc, col = sim, group = sim) +
+  aes(mn_length, Fsusc, col = as.factor(sim), group = as.factor(sim)) +
   geom_line() +
   theme_classic() +
-  facet_wrap(~spp)
+  #scale_color_viridis_c() +
+  facet_wrap(~spp, scales = 'free') +
+  labs(col = 'Sim', x = 'Length (cm)', y = 'Fishing mortality (F)')
 ```
 
 \clearpage
-
-\]
 
 ## Estimating productivity
 
 Now that we have susceptibility values, we can input these into the yield-per-recruit analysis and spawn-per-recruit to determine productivity values for EASI-Fish. Note that the biomass values output are not independent of the susceptibility values and so only susceptibility values (i.e. fishing mortality) were presented in Hill et al. (in prep). But, we still apply this portion of the analysis for completeness. It also compares the susceptibility results against various reference points which is needed.
 
-The get_Bprod() function takes life history input data as well as the results of the susceptibility portion of EASI-Fish and applies a yield-per-recruit and spawn-per-recruit analysis.
+The get_Bprod() function takes life history input data as well as the results of the susceptibility portion of EASI-Fish and applies a yield-per-recruit and spawn-per-recruit analysis. It outputs a dataframe by simulation, species, x which represents fishing mortality, and results including ypr, spr, slope and SSBr.
 
 ```{r}
 # Combine susceptibility results with lh processes to run ypr and spr
@@ -416,7 +403,7 @@ Now that we have run the EASI-Fish analysis, we can explore outputs and present 
 
 Note these results are not identical to those in Hill et al. (in prep) and so should not be compared as such.
 
-```{r echo = F}
+```{r echo = F, fig.width=8, fig.height=11}
 Bprod_df |>
   pivot_longer(-c(sim, spp, x), names_to = 'param', values_to = 'value') |>
   group_by(spp, x, param) |>
@@ -428,7 +415,7 @@ Bprod_df |>
   aes(x, val_mn) +
   geom_line(col = 'black') +
   geom_ribbon(aes(x = x, ymin = val_lwr, ymax = val_upr), 
-              col = 'grey50', alpha = 0.2) +
+              fill = 'grey50', col = NA, alpha = 0.2) +
   facet_wrap(vars(param, spp), scales = 'free_y', ncol = 2) +
   xlim(0,5) +
   theme_classic() +
@@ -483,16 +470,15 @@ ggplot() +
   theme(axis.title.y = element_blank())
 #p
 
-library(grid)
 p2 <- p + annotation_custom(grob = textGrob(expression(bold(F[60])),
-                                            gp = gpar(fontsize = 10, fontface = "bold")),
-                            xmin = 0.65, xmax = 0.75, ymin = 25.8, ymax = 25.8) +
+                            gp = gpar(fontsize = 10, fontface = "bold")),
+                            xmin = 0.55, xmax = 0.65, ymin = 2.5, ymax = 2.5) +
   annotation_custom(grob = textGrob(expression(bold(F[40])),
-                                    gp = gpar(fontsize = 10, fontface = "bold")),
-                    xmin = 0.9, xmax = 1.1, ymin = 25.8, ymax = 25.8) +
+                           gp = gpar(fontsize = 10, fontface = "bold")),
+                          xmin = 0.9, xmax = 1.1, ymin = 2.5, ymax = 2.5) +
   annotation_custom(grob = textGrob(expression(bold(F[0.1])),
-                                    gp = gpar(fontsize = 10, fontface = "bold")),
-                    xmin = 1.9, xmax = 2, ymin = 25.8, ymax = 25.8) +
+                            gp = gpar(fontsize = 10, fontface = "bold")),
+                            xmin = 3.1, xmax = 3.2, ymin = 2.5, ymax = 2.5) +
   ggtitle("")
 p2
 ```
@@ -518,3 +504,9 @@ flextable(tbl) |>
   set_table_properties(layout = "fixed") |>
   autofit()
 ```
+
+## References
+
+-   Griffiths, S.P., Kesner-Reyes, K., Garilao, C., Duffy, L.M. and Román, M.H., 2019. Ecological Assessment of the Sustainable Impacts of Fisheries (EASI-Fish): a flexible vulnerability assessment approach to quantify the cumulative impacts of fishing in data-limited settings. *Marine Ecology Progress Series*, *625*, pp.89-113.
+
+-   Hill, N.J., Allain, V., Griffiths, S., Nicol, S., Potts, J., Phillip Jr, N.B. and Rigby, C.L. (in prep). Assessing the vulnerability of elasmobranchs to western and central Pacific tuna fisheries using an improved ecological risk assessment method. *Fisheries Research.*
